@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduApp - Estudiante</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        main > section { display: none; }
+        main > section.active { display: block; }
+        .foro-container td { vertical-align: top; }
+        .foro-container .form-respuesta-foro { max-width: 300px; }
+        .perfil-container { max-width: 600px; margin: auto; }
+    </style>
+</head>
+<body>
+    <header class="bg-dark text-white text-center py-4">
+        <h1 class="display-4">EduApp - Estudiante</h1>
+        <div id="usuario-info" class="mb-3"></div>
+        <nav>
+            <ul class="nav justify-content-center mt-3">
+                <li class="nav-item"><a class="nav-link text-white" href="#perfil">Perfil</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="#notas">Mis Notas</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="#tareas">Tareas</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="#foros">Foros</a></li>
+                <li class="nav-item"><a class="nav-link text-white" href="#matriculas">Matrículas</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container mt-5">
+        <section id="perfil" class="mb-5">
+            <h2>Mi Perfil</h2>
+            <div id="perfil-usuario" class="perfil-container">
+                <div id="perfil-info" class="mb-4"></div>
+                <button class="btn btn-warning" onclick="editarPerfil()">Editar Perfil</button>
+            </div>
+        </section>
+
+        <section id="notas" class="mb-5">
+            <h2>Mis Notas</h2>
+            <div id="tabla-notas" class="table-responsive"></div>
+        </section>
+
+        <section id="tareas" class="mb-5">
+            <h2>Tareas</h2>
+            <div id="lista-tareas-estudiante" class="table-responsive mb-4"></div>
+        </section>
+
+        <section id="foros" class="mb-5">
+            <h2>Foros</h2>
+            <div id="lista-foros-estudiante" class="foro-container table-responsive"></div>
+        </section>
+
+        <section id="matriculas" class="mb-5">
+            <h2>Matrículas</h2>
+            <div id="lista-matriculas-estudiante" class="table-responsive"></div>
+        </section>
+    </main>
+
+    <footer class="bg-dark text-white text-center py-3 fixed-bottom">
+        <p>© 2025 EduApp. Todos los derechos reservados.</p>
+    </footer>
+
+    <script src="utils.js"></script>
+    <script src="script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('estudiante.html cargado correctamente');
+            const usuarioActual = appData.getUsuarioActual();
+            console.log('Usuario actual:', usuarioActual);
+
+            if (!usuarioActual || usuarioActual.rol !== 'estudiante') {
+                alert('Acceso denegado. Solo para estudiantes.');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // Cargar datos iniciales desde localStorage con valores por defecto
+            appData.estudiantes = appData.loadFromStorage('estudiantes') || [];
+            appData.tareas = appData.loadFromStorage('tareas') || [];
+            appData.foros = appData.loadFromStorage('foros') || [];
+            appData.matriculas = appData.loadFromStorage('matriculas') || [];
+            appData.materiasDisponibles = appData.materiasDisponibles || ['Matemáticas', 'Ciencias', 'Historia']; // Ejemplo
+            console.log('Datos iniciales:', { estudiantes: appData.estudiantes, tareas: appData.tareas, foros: appData.foros, matriculas: appData.matriculas });
+
+            window.utils.actualizarInterfazUsuario();
+
+            function mostrarSeccion(seccionId) {
+                const secciones = document.querySelectorAll('main > section');
+                secciones.forEach(seccion => seccion.classList.toggle('active', seccion.id === seccionId));
+                console.log('Sección mostrada:', seccionId);
+            }
+
+            document.querySelectorAll('nav a').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const seccionId = e.target.getAttribute('href').substring(1);
+                    mostrarSeccion(seccionId);
+                    if (seccionId === 'perfil') renderPerfil();
+                    if (seccionId === 'notas') renderNotas();
+                    if (seccionId === 'tareas') renderTareasEstudiante();
+                    if (seccionId === 'foros') renderForosEstudiante();
+                    if (seccionId === 'matriculas') renderMatriculasEstudiante();
+                });
+            });
+
+            mostrarSeccion('perfil');
+
+            function renderPerfil() {
+                const perfilInfo = document.getElementById('perfil-info');
+                if (!perfilInfo) return console.error('Elemento #perfil-info no encontrado');
+                const estudiante = appData.getEstudiantePorEmail(usuarioActual.email) || usuarioActual;
+                perfilInfo.innerHTML = `
+                    <p><strong>Nombre:</strong> ${estudiante.nombre} ${estudiante.apellido}</p>
+                    <p><strong>Email:</strong> ${estudiante.email}</p>
+                    <p><strong>Rol:</strong> ${estudiante.rol}</p>
+                    <p><strong>Notas registradas:</strong> ${estudiante.notas ? estudiante.notas.length : 0}</p>
+                    <p><strong>Promedio:</strong> ${appData.calcularPromedio(estudiante)}</p>
+                `;
+                console.log('Perfil renderizado:', estudiante);
+            }
+
+            window.editarPerfil = function() {
+                const estudiante = appData.getEstudiantePorEmail(usuarioActual.email) || usuarioActual;
+                const nombre = prompt('Editar nombre:', estudiante.nombre);
+                const apellido = prompt('Editar apellido:', estudiante.apellido);
+                const password = prompt('Editar contraseña (dejar en blanco para no cambiar):', '');
+
+                if (nombre && apellido) {
+                    const usuarios = appData.loadFromStorage('usuarios') || [];
+                    const usuarioIndex = usuarios.findIndex(u => u.email === usuarioActual.email);
+                    if (usuarioIndex !== -1) {
+                        usuarios[usuarioIndex].nombre = nombre;
+                        usuarios[usuarioIndex].apellido = apellido;
+                        if (password) usuarios[usuarioIndex].password = password;
+                        appData.saveToStorage('usuarios', usuarios);
+                        appData.saveToStorage('usuarioActual', usuarios[usuarioIndex]);
+                    }
+
+                    const estudiantesData = appData.loadFromStorage('estudiantes') || [];
+                    const estudianteIndex = estudiantesData.findIndex(e => e.email === usuarioActual.email);
+                    if (estudianteIndex !== -1) {
+                        estudiantesData[estudianteIndex].nombre = nombre;
+                        estudiantesData[estudianteIndex].apellido = apellido;
+                    } else {
+                        estudiantesData.push({ nombre, apellido, email: usuarioActual.email, notas: estudiante.notas || [] });
+                    }
+                    appData.saveToStorage('estudiantes', estudiantesData);
+                    appData.registrarHistorial('Editar Perfil', `${nombre} ${apellido} actualizó su perfil`);
+                    renderPerfil();
+                    window.utils.actualizarInterfazUsuario();
+                    alert('Perfil actualizado');
+                } else {
+                    alert('Nombre y apellido son obligatorios');
+                }
+            };
+
+            function renderNotas() {
+                const tablaNotas = document.getElementById('tabla-notas');
+                if (!tablaNotas) return console.error('Elemento #tabla-notas no encontrado');
+                const estudiante = appData.getEstudiantePorEmail(usuarioActual.email);
+                tablaNotas.innerHTML = `
+                    <table class="table table-striped table-hover table-bordered">
+                        <thead class="table-dark">
+                            <tr><th>Materia</th><th>Calificación</th><th>Tipo</th><th>Fecha</th></tr>
+                        </thead>
+                        <tbody>
+                            ${estudiante && estudiante.notas && estudiante.notas.length > 0 ? estudiante.notas.map(nota => `
+                                <tr><td>${nota.materia}</td><td>${nota.calificacion}</td><td>${nota.tipo}</td><td>${nota.fecha}</td></tr>
+                            `).join('') : '<tr><td colspan="4">Sin notas</td></tr>'}
+                        </tbody>
+                    </table>
+                    <p>Promedio: ${estudiante ? appData.calcularPromedio(estudiante) : 'N/A'}</p>
+                `;
+                console.log('Notas renderizadas:', estudiante?.notas);
+            }
+
+            function renderTareasEstudiante() {
+                const listaTareas = document.getElementById('lista-tareas-estudiante');
+                if (!listaTareas) return console.error('Elemento #lista-tareas-estudiante no encontrado');
+                listaTareas.innerHTML = `
+                    <table class="table table-striped table-hover table-bordered">
+                        <thead class="table-dark">
+                            <tr><th>ID</th><th>Nombre</th><th>Tipo</th><th>Fecha</th><th>Archivo del Profesor</th><th>Mi Respuesta</th><th>Mi Archivo</th><th>Calificación</th><th>Acciones</th></tr>
+                        </thead>
+                        <tbody>
+                            ${appData.tareas.length > 0 ? appData.tareas.map(tarea => {
+                                const respuesta = tarea.respuestas?.find(r => r.estudiante === usuarioActual.email);
+                                return `
+                                <tr>
+                                    <td>${tarea.id}</td>
+                                    <td>${tarea.nombre}</td>
+                                    <td>${tarea.tipo}</td>
+                                    <td>${tarea.fecha}</td>
+                                    <td>${tarea.archivo ? `<a href="${tarea.archivo}" download>Descargar</a>` : 'Sin archivo'}</td>
+                                    <td>${respuesta ? respuesta.respuesta : 'No enviada'}</td>
+                                    <td>${respuesta && respuesta.archivo ? `<a href="${respuesta.archivo}" download>Descargar</a>` : 'Sin archivo'}</td>
+                                    <td>${respuesta && respuesta.calificacion !== undefined ? respuesta.calificacion : 'Pendiente'}</td>
+                                    <td>
+                                        <form class="form-respuesta-tarea d-flex gap-2" data-tarea-id="${tarea.id}">
+                                            <input type="text" class="form-control" placeholder="Escribe tu respuesta" value="${respuesta ? respuesta.respuesta : ''}" required>
+                                            <input type="file" class="form-control" id="respuesta-archivo-${tarea.id}" accept=".pdf,.jpg,.png">
+                                            <button type="submit" class="btn btn-primary btn-sm">${respuesta ? 'Actualizar' : 'Enviar'}</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                `;
+                            }).join('') : '<tr><td colspan="9">No hay tareas disponibles</td></tr>'}
+                        </tbody>
+                    </table>
+                `;
+                document.querySelectorAll('.form-respuesta-tarea').forEach(form => {
+                    form.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        const tareaId = form.getAttribute('data-tarea-id');
+                        const respuestaTexto = form.querySelector('input[type="text"]').value.trim();
+                        const archivoInput = form.querySelector(`#respuesta-archivo-${tareaId}`);
+                        const archivo = archivoInput.files[0];
+
+                        if (!respuestaTexto) return alert('La respuesta no puede estar vacía');
+                        if (archivo && archivo.size > 5 * 1024 * 1024) return alert('El archivo no debe exceder los 5MB');
+
+                        const tarea = appData.tareas.find(t => t.id === tareaId);
+                        subirTarea(tarea, respuestaTexto, archivo);
+                    });
+                });
+                console.log('Tareas renderizadas:', appData.tareas);
+            }
+
+            function subirTarea(tarea, respuestaTexto, archivo) {
+                console.log('Subiendo tarea:', tarea.id, respuestaTexto);
+                const nuevaRespuesta = {
+                    estudiante: usuarioActual.email,
+                    respuesta: respuestaTexto,
+                    archivo: null,
+                    fechaEnvio: new Date().toLocaleString()
+                };
+
+                if (!tarea.respuestas) tarea.respuestas = [];
+
+                if (archivo) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        nuevaRespuesta.archivo = event.target.result;
+                        guardarRespuesta(tarea, nuevaRespuesta);
+                    };
+                    reader.onerror = () => alert('Error al cargar el archivo');
+                    reader.readAsDataURL(archivo);
+                } else {
+                    guardarRespuesta(tarea, nuevaRespuesta);
+                }
+            }
+
+            function guardarRespuesta(tarea, respuesta) {
+                const existing = tarea.respuestas.find(r => r.estudiante === respuesta.estudiante);
+                if (existing) {
+                    existing.respuesta = respuesta.respuesta;
+                    existing.archivo = respuesta.archivo;
+                    existing.fechaEnvio = respuesta.fechaEnvio;
+                } else {
+                    tarea.respuestas.push(respuesta);
+                }
+                appData.saveToStorage('tareas', appData.tareas);
+                appData.registrarHistorial('Enviar/Actualizar Respuesta', `${usuarioActual.nombre} respondió la tarea ${tarea.nombre}`);
+                renderTareasEstudiante();
+                alert(`Tarea ${existing ? 'actualizada' : 'enviada'} con éxito`);
+                console.log('Respuesta guardada:', tarea);
+            }
+
+            function renderForosEstudiante() {
+                const listaForos = document.getElementById('lista-foros-estudiante');
+                if (!listaForos) return console.error('Elemento #lista-foros-estudiante no encontrado');
+                listaForos.innerHTML = `
+                    <table class="table table-striped table-hover table-bordered">
+                        <thead class="table-dark">
+                            <tr><th>ID</th><th>Tema</th><th>Mensaje</th><th>Autor</th><th>Fecha Creación</th><th>Respuestas</th><th>Acciones</th></tr>
+                        </thead>
+                        <tbody>
+                            ${appData.foros.filter(f => f.visibleParaEstudiantes).length > 0 ? appData.foros.filter(f => f.visibleParaEstudiantes).map((foro, index) => `
+                                <tr>
+                                    <td>${foro.id}</td>
+                                    <td>${foro.tema}</td>
+                                    <td>${foro.mensaje}</td>
+                                    <td>${foro.autor}</td>
+                                    <td>${foro.fechaCreacion || 'No disponible'}</td>
+                                    <td>${foro.respuestas?.length > 0 ? foro.respuestas.map(r => `<div>${r.mensaje} <br><small>(${r.autor}, ${r.fecha})</small></div>`).join('') : 'Sin respuestas'}</td>
+                                    <td>
+                                        <form class="form-respuesta-foro d-flex gap-2" data-foro-id="${foro.id}">
+                                            <input type="text" class="form-control" placeholder="Responder" required>
+                                            <button type="submit" class="btn btn-primary btn-sm">Responder</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            `).join('') : '<tr><td colspan="7">No hay foros disponibles</td></tr>'}
+                        </tbody>
+                    </table>
+                `;
+                document.querySelectorAll('.form-respuesta-foro').forEach(form => {
+                    form.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        const foroId = form.getAttribute('data-foro-id');
+                        const mensaje = form.querySelector('input').value.trim();
+                        if (!mensaje) return alert('El mensaje no puede estar vacío');
+                        const foro = appData.foros.find(f => f.id === foroId);
+                        if (!foro.respuestas) foro.respuestas = [];
+                        foro.respuestas.push({
+                            mensaje,
+                            autor: usuarioActual.nombre,
+                            fecha: new Date().toLocaleString()
+                        });
+                        appData.saveToStorage('foros', appData.foros);
+                        appData.registrarHistorial('Responder Foro', `${usuarioActual.nombre} respondió al foro ${foro.tema}`);
+                        renderForosEstudiante();
+                        form.reset();
+                        alert('Respuesta publicada');
+                    });
+                });
+                console.log('Foros renderizados:', appData.foros);
+            }
+
+            function renderMatriculasEstudiante() {
+                const listaMatriculas = document.getElementById('lista-matriculas-estudiante');
+                if (!listaMatriculas) return console.error('Elemento #lista-matriculas-estudiante no encontrado');
+                const misMatriculas = appData.matriculas.filter(m => m.estudiante === usuarioActual.email);
+                const clasesDisponibles = appData.materiasDisponibles.filter(m => !misMatriculas.some(mat => mat.materia === m));
+                listaMatriculas.innerHTML = `
+                    <h3>Mis Matrículas</h3>
+                    <table class="table table-striped table-hover table-bordered">
+                        <thead class="table-dark"><tr><th>Materia</th><th>Fecha</th></tr></thead>
+                        <tbody>
+                            ${misMatriculas.length > 0 ? misMatriculas.map(mat => `<tr><td>${mat.materia}</td><td>${mat.fecha}</td></tr>`).join('') : '<tr><td colspan="2">Sin matrículas</td></tr>'}
+                        </tbody>
+                    </table>
+                    <h3>Clases Disponibles</h3>
+                    <table class="table table-striped table-hover table-bordered">
+                        <thead class="table-dark"><tr><th>Materia</th><th>Acción</th></tr></thead>
+                        <tbody>
+                            ${clasesDisponibles.length > 0 ? clasesDisponibles.map(materia => `
+                                <tr><td>${materia}</td><td><button class="btn btn-primary btn-sm" onclick="matricularClase('${materia}')">Matricularse</button></td></tr>
+                            `).join('') : '<tr><td colspan="2">No hay clases disponibles</td></tr>'}
+                        </tbody>
+                    </table>
+                `;
+                console.log('Matrículas renderizadas:', misMatriculas);
+            }
+
+            window.matricularClase = (materia) => {
+                if (!appData.matriculas.some(m => m.estudiante === usuarioActual.email && m.materia === materia)) {
+                    appData.matriculas.push({ estudiante: usuarioActual.email, materia, fecha: new Date().toLocaleDateString() });
+                    appData.saveToStorage('matriculas', appData.matriculas);
+                    appData.registrarHistorial('Matrícula', `${usuarioActual.nombre} se matriculó en ${materia}`);
+                    renderMatriculasEstudiante();
+                    alert(`Te has matriculado en ${materia}`);
+                } else {
+                    alert('Ya estás matriculado en esta materia');
+                }
+            };
+
+            // Inicializar vistas
+            renderPerfil();
+            renderNotas();
+            renderTareasEstudiante();
+            renderForosEstudiante();
+            renderMatriculasEstudiante();
+        });
+    </script>
+</body>
+</html>

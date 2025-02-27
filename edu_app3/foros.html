@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduApp - Foros (Profesor)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .foro-container td { vertical-align: top; }
+        .foro-container .form-respuesta { max-width: 300px; }
+    </style>
+</head>
+<body>
+    <header class="bg-dark text-white text-center py-4">
+        <h1 class="display-4">EduApp - Foros (Profesor)</h1>
+        <div id="usuario-info" class="mb-3"></div>
+        <nav>
+            <ul class="nav justify-content-center mt-3">
+                <li class="nav-item"><a class="nav-link text-white" href="profesor.html">Volver al Panel Principal</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container mt-5">
+        <section id="foros" class="mb-5">
+            <h2>Foros</h2>
+            <form id="form-foro" class="mb-4">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label for="tema-foro" class="form-label">Título</label>
+                        <input type="text" class="form-control" id="tema-foro" placeholder="Título" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="input-foro" class="form-label">Mensaje</label>
+                        <textarea class="form-control" id="input-foro" placeholder="Mensaje" rows="2" required></textarea>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">Crear Foro</button>
+                    </div>
+                </div>
+            </form>
+            <div id="lista-foros" class="foro-container table-responsive"></div>
+        </section>
+    </main>
+
+    <footer class="bg-dark text-white text-center py-3 fixed-bottom">
+        <p>© 2025 EduApp. Todos los derechos reservados.</p>
+    </footer>
+
+    <script src="utils.js"></script>
+    <script src="script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('foros.html cargado correctamente');
+
+            const usuarioActual = appData.getUsuarioActual();
+            console.log('Usuario actual:', usuarioActual);
+            if (!usuarioActual || usuarioActual.rol !== 'profesor') {
+                alert('Acceso denegado. Solo para profesores.');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            window.utils.actualizarInterfazUsuario();
+
+            // Cargar foros iniciales desde localStorage
+            appData.foros = appData.loadFromStorage('foros') || [];
+            console.log('Foros cargados desde localStorage:', appData.foros);
+
+            const formForo = document.getElementById('form-foro');
+            if (formForo) {
+                formForo.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    console.log('Formulario de foro enviado');
+                    const tema = document.getElementById('tema-foro').value.trim();
+                    const mensaje = document.getElementById('input-foro').value.trim();
+                    console.log('Datos del formulario:', { tema, mensaje });
+                    if (appData.validarDatos({ tema, mensaje }, ['tema', 'mensaje'])) {
+                        const nuevoForo = {
+                            id: appData.generarId(),
+                            tema,
+                            mensaje,
+                            autor: usuarioActual.nombre,
+                            respuestas: [],
+                            fechaCreacion: new Date().toLocaleString(),
+                            visibleParaEstudiantes: true
+                        };
+                        appData.foros.push(nuevoForo);
+                        appData.saveToStorage('foros', appData.foros);
+                        appData.registrarHistorial('Crear Foro', tema);
+                        renderForos();
+                        formForo.reset();
+                        alert('Foro creado y publicado para los estudiantes');
+                        console.log('Foro guardado:', nuevoForo);
+                        console.log('Estado actual de appData.foros:', appData.foros);
+                        console.log('Datos guardados en localStorage:', JSON.parse(localStorage.getItem('foros')));
+                    } else {
+                        alert('Complete todos los campos del foro');
+                    }
+                });
+            } else {
+                console.error('Elemento #form-foro no encontrado');
+            }
+
+            function renderForos() {
+                const listaForos = document.getElementById('lista-foros');
+                if (listaForos) {
+                    console.log('Renderizando foros, cantidad:', appData.foros.length);
+                    listaForos.innerHTML = `
+                        <table class="table table-striped table-hover table-bordered excel-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Tema</th>
+                                    <th>Mensaje</th>
+                                    <th>Autor</th>
+                                    <th>Fecha Creación</th>
+                                    <th>Respuestas</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${appData.foros.map((foro, index) => `
+                                    <tr>
+                                        <td>${foro.id}</td>
+                                        <td>${foro.tema}</td>
+                                        <td>${foro.mensaje}</td>
+                                        <td>${foro.autor}</td>
+                                        <td>${foro.fechaCreacion}</td>
+                                        <td>
+                                            ${foro.respuestas.length > 0 ? foro.respuestas.map(r => `
+                                                <div>${r.mensaje} <br><small>(${r.autor}, ${r.fecha})</small></div>
+                                            `).join('') : 'Sin respuestas'}
+                                        </td>
+                                        <td>
+                                            <form class="form-respuesta d-flex gap-2" data-tema-id="${index}">
+                                                <input type="text" class="form-control" placeholder="Responder" required>
+                                                <button type="submit" class="btn btn-primary btn-sm">Responder</button>
+                                            </form>
+                                            <button class="btn btn-danger btn-sm mt-2" onclick="eliminarForo(${index})">Eliminar</button>
+                                        </td>
+                                    </tr>
+                                `).join('') || '<tr><td colspan="7">No hay foros creados.</td></tr>'}
+                            </tbody>
+                        </table>
+                    `;
+                    document.querySelectorAll('.form-respuesta').forEach(form => {
+                        form.addEventListener('submit', (e) => {
+                            e.preventDefault();
+                            const temaId = parseInt(e.target.getAttribute('data-tema-id'));
+                            const mensaje = e.target.querySelector('input').value.trim();
+                            console.log('Respuesta enviada para foro ID:', temaId, 'Mensaje:', mensaje);
+                            if (mensaje) {
+                                appData.foros[temaId].respuestas.push({
+                                    mensaje,
+                                    autor: usuarioActual.nombre,
+                                    fecha: new Date().toLocaleString()
+                                });
+                                appData.saveToStorage('foros', appData.foros);
+                                appData.registrarHistorial('Responder Foro', `${appData.foros[temaId].tema} - ${mensaje}`);
+                                renderForos();
+                                e.target.reset();
+                                alert('Respuesta publicada');
+                                console.log('Foro actualizado con respuesta:', appData.foros[temaId]);
+                            }
+                        });
+                    });
+                } else {
+                    console.error('Elemento #lista-foros no encontrado');
+                }
+            }
+
+            window.eliminarForo = (index) => {
+                console.log('Eliminando foro en índice:', index);
+                if (confirm('¿Seguro que desea eliminar este foro?')) {
+                    const foroEliminado = appData.foros[index];
+                    appData.foros.splice(index, 1);
+                    appData.saveToStorage('foros', appData.foros);
+                    appData.registrarHistorial('Eliminar Foro', foroEliminado.tema);
+                    renderForos();
+                    alert('Foro eliminado');
+                    console.log('Foro eliminado, estado actual de foros:', appData.foros);
+                }
+            };
+
+            // Inicializar vista de foros
+            renderForos();
+        });
+    </script>
+</body>
+</html>

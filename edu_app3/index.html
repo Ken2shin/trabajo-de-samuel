@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduApp - Login y Registro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f8f9fa;
+        }
+        .auth-container {
+            max-width: 500px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .tab-content { padding-top: 20px; }
+        .nav-tabs { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h1 class="text-center mb-4">EduApp</h1>
+        <ul class="nav nav-tabs" id="authTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="login-tab" data-bs-toggle="tab" data-bs-target="#login" type="button" role="tab" aria-controls="login" aria-selected="true">Iniciar Sesión</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="register-tab" data-bs-toggle="tab" data-bs-target="#register" type="button" role="tab" aria-controls="register" aria-selected="false">Registrarse</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="authTabContent">
+            <!-- Formulario de Inicio de Sesión -->
+            <div class="tab-pane fade show active" id="login" role="tabpanel" aria-labelledby="login-tab">
+                <form id="login-form">
+                    <div class="mb-3">
+                        <label for="login-email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="login-email" placeholder="ejemplo@eduapp.local" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="login-password" class="form-label">Contraseña</label>
+                        <input type="password" class="form-control" id="login-password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Iniciar Sesión</button>
+                </form>
+            </div>
+
+            <!-- Formulario de Registro -->
+            <div class="tab-pane fade" id="register" role="tabpanel" aria-labelledby="register-tab">
+                <form id="register-form">
+                    <div class="mb-3">
+                        <label for="register-nombre" class="form-label">Nombre</label>
+                        <input type="text" class="form-control" id="register-nombre" placeholder="Nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="register-apellido" class="form-label">Apellido</label>
+                        <input type="text" class="form-control" id="register-apellido" placeholder="Apellido" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="register-password" class="form-label">Contraseña</label>
+                        <input type="password" class="form-control" id="register-password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="register-rol" class="form-label">Rol</label>
+                        <select class="form-select" id="register-rol" required>
+                            <option value="profesor">Profesor</option>
+                            <option value="estudiante">Estudiante</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Registrarse</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="utils.js"></script>
+    <script src="script.js"></script>
+    <script>
+        // Manejar el inicio de sesión
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+            console.log('Intento de login con:', { email, password });
+            const usuario = appData.loginUsuario(email, password);
+            if (usuario) {
+                console.log('Login exitoso:', usuario);
+                if (usuario.rol === 'profesor') {
+                    window.location.href = 'profesor.html';
+                } else if (usuario.rol === 'estudiante') {
+                    window.location.href = 'estudiante.html';
+                } else {
+                    alert('Rol no reconocido');
+                    console.warn('Rol no reconocido:', usuario.rol);
+                }
+            } else {
+                alert('Credenciales inválidas');
+                console.warn('Login fallido para:', email);
+            }
+        });
+
+        // Manejar el registro
+        document.getElementById('register-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const nombre = document.getElementById('register-nombre').value.trim();
+            const apellido = document.getElementById('register-apellido').value.trim();
+            const password = document.getElementById('register-password').value;
+            const rol = document.getElementById('register-rol').value;
+            console.log('Intento de registro con:', { nombre, apellido, password, rol });
+
+            // Generar correo institucional
+            const email = appData.generarCorreoInstitucional(nombre, apellido);
+            const nuevoUsuario = { nombre, apellido, email, rol, password };
+
+            if (appData.registrarUsuario(nuevoUsuario)) {
+                alert(`Registro exitoso. Tu correo institucional es: ${email}. Por favor, inicia sesión con estas credenciales.`);
+                console.log('Registro exitoso:', nuevoUsuario);
+                // No iniciar sesión automáticamente para que el usuario use sus nuevas credenciales
+                document.getElementById('login-email').value = email; // Prellenar el email
+                document.getElementById('login-tab').click(); // Cambiar a la pestaña de login
+            } else {
+                alert('Error al registrar. El correo generado ya existe.');
+                console.warn('Registro fallido, email ya existe:', email);
+            }
+        });
+    </script>
+</body>
+</html>
